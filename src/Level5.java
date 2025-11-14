@@ -103,24 +103,39 @@ public class Level5 {
             return direct;
         }
 
-        // Try various detour strategies
-        // Strategy 1: Vertical detours
-        for (int detour : new int[]{3, 4, 5, 6, 7, -3, -4, -5, -6, -7, 8, 9, 10, -8, -9, -10}) {
+        // Try various detour strategies with wider range
+        // Strategy 1: Vertical detours (go up/down first, then horizontal)
+        for (int detour = -20; detour <= 20; detour++) {
+            if (detour == 0) continue;
             String[] path = generateVerticalDetour(goal, asteroid, timeLimit, detour);
             if (path != null && isPathSafe(path, asteroid, goal)) {
                 return path;
             }
         }
 
-        // Strategy 2: Horizontal detours
-        for (int detour : new int[]{3, 4, 5, 6, 7, -3, -4, -5, -6, -7, 8, 9, 10, -8, -9, -10}) {
+        // Strategy 2: Horizontal detours (go left/right first, then vertical)
+        for (int detour = -20; detour <= 20; detour++) {
+            if (detour == 0) continue;
             String[] path = generateHorizontalDetour(goal, asteroid, timeLimit, detour);
             if (path != null && isPathSafe(path, asteroid, goal)) {
                 return path;
             }
         }
 
-        // Fallback: return direct path
+        // Strategy 3: Try waypoint routing around asteroid
+        // Calculate safe waypoints based on asteroid position
+        int[] waypointOffsets = {-4, -5, -6, -7, 4, 5, 6, 7, -8, 8, -10, 10, -15, 15};
+        for (int xOffset : waypointOffsets) {
+            for (int yOffset : waypointOffsets) {
+                Point waypoint = new Point(asteroid.x + xOffset, asteroid.y + yOffset);
+                String[] path = generateWaypointPath(waypoint, goal, timeLimit);
+                if (path != null && isPathSafe(path, asteroid, goal)) {
+                    return path;
+                }
+            }
+        }
+
+        // Fallback: return direct path (even if unsafe)
         return direct;
     }
 
@@ -182,6 +197,38 @@ public class Level5 {
         return new String[]{sequenceToString(xSeq), sequenceToString(ySeq)};
     }
 
+    private static String[] generateWaypointPath(Point waypoint, Point goal, int timeLimit) {
+        List<Integer> xSeq = new ArrayList<>();
+        List<Integer> ySeq = new ArrayList<>();
+
+        xSeq.add(0);
+        ySeq.add(0);
+
+        // Step 1: Go to waypoint X
+        List<Integer> wp1XSeq = parseSequence(generateSequence1D(waypoint.x, timeLimit));
+        addSequencePart(xSeq, wp1XSeq);
+        padSequence(ySeq, wp1XSeq.size() - 1);
+
+        // Step 2: Go to waypoint Y
+        List<Integer> wp1YSeq = parseSequence(generateSequence1D(waypoint.y, timeLimit));
+        addSequencePart(ySeq, wp1YSeq);
+        padSequence(xSeq, wp1YSeq.size() - 1);
+
+        // Step 3: Go from waypoint to goal X
+        int remainingX = goal.x - waypoint.x;
+        List<Integer> finalXSeq = parseSequence(generateSequence1D(remainingX, timeLimit));
+        addSequencePart(xSeq, finalXSeq);
+        padSequence(ySeq, finalXSeq.size() - 1);
+
+        // Step 4: Go from waypoint to goal Y
+        int remainingY = goal.y - waypoint.y;
+        List<Integer> finalYSeq = parseSequence(generateSequence1D(remainingY, timeLimit));
+        addSequencePart(ySeq, finalYSeq);
+        padSequence(xSeq, finalYSeq.size() - 1);
+
+        return new String[]{sequenceToString(xSeq), sequenceToString(ySeq)};
+    }
+
     private static void addSequencePart(List<Integer> target, List<Integer> source) {
         // Skip the first 0 from source (it's the starting pace)
         for (int i = 1; i < source.size(); i++) {
@@ -224,6 +271,11 @@ public class Level5 {
         int tickX = 0;
         int tickY = 0;
 
+        // Check collision at starting position
+        if (Math.abs(state.x - asteroid.x) <= 2 && Math.abs(state.y - asteroid.y) <= 2) {
+            return false; // Collision at start!
+        }
+
         // Simulate each step using tick-based movement
         for (int step = 0; step < xExpanded.size(); step++) {
             state.vx = xExpanded.get(step);
@@ -236,6 +288,9 @@ public class Level5 {
                     tickX = 0;
                     state.x += (state.vx > 0) ? 1 : -1;
                 }
+            } else if (state.vx == 0) {
+                // Reset ticks when velocity is 0
+                tickX = 0;
             }
 
             // Y movement with tick system
@@ -245,6 +300,9 @@ public class Level5 {
                     tickY = 0;
                     state.y += (state.vy > 0) ? 1 : -1;
                 }
+            } else if (state.vy == 0) {
+                // Reset ticks when velocity is 0
+                tickY = 0;
             }
 
             // Check collision with asteroid (safety radius of 2)
