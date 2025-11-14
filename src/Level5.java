@@ -73,7 +73,7 @@ public class Level5 {
     }
 
     private static String[] findPath(int goalX, int goalY, int asteroidX, int asteroidY) {
-        // Try direct path first (simultaneous X and Y)
+        // Try direct path first
         String[] direct = generateOptimalPath(goalX, goalY);
         if (isSafe(direct[0], direct[1], asteroidX, asteroidY, goalX, goalY)) {
             return direct;
@@ -91,8 +91,35 @@ public class Level5 {
             return yFirst;
         }
 
-        // Try detours with waypoints
-        for (int offset = 3; offset <= 100; offset += 2) {
+        // Try U-shaped paths: perpendicular detour, then parallel, then back
+        for (int offset = 3; offset <= 20; offset++) {
+            // Try going UP, then X, then back to Y
+            String[] upPath = generateUShapedPath(goalX, goalY, 0, offset);
+            if (isSafe(upPath[0], upPath[1], asteroidX, asteroidY, goalX, goalY)) {
+                return upPath;
+            }
+
+            // Try going DOWN, then X, then back to Y
+            String[] downPath = generateUShapedPath(goalX, goalY, 0, -offset);
+            if (isSafe(downPath[0], downPath[1], asteroidX, asteroidY, goalX, goalY)) {
+                return downPath;
+            }
+
+            // Try going RIGHT, then Y, then back to X
+            String[] rightPath = generateUShapedPath(goalX, goalY, offset, 0);
+            if (isSafe(rightPath[0], rightPath[1], asteroidX, asteroidY, goalX, goalY)) {
+                return rightPath;
+            }
+
+            // Try going LEFT, then Y, then back to X
+            String[] leftPath = generateUShapedPath(goalX, goalY, -offset, 0);
+            if (isSafe(leftPath[0], leftPath[1], asteroidX, asteroidY, goalX, goalY)) {
+                return leftPath;
+            }
+        }
+
+        // Try general waypoint detours
+        for (int offset = 3; offset <= 100; offset += 5) {
             int[][] detours = {
                 {0, offset}, {0, -offset}, {offset, 0}, {-offset, 0},
                 {offset, offset}, {-offset, offset}, {offset, -offset}, {-offset, -offset}
@@ -110,6 +137,27 @@ public class Level5 {
         return direct;
     }
 
+    private static String[] generateUShapedPath(int goalX, int goalY, int detourX, int detourY) {
+        // Generate U-shaped path: (0,0) -> (detourX, detourY) -> (goalX, goalY)
+        List<Integer> xPaces = new ArrayList<>();
+        List<Integer> yPaces = new ArrayList<>();
+
+        xPaces.add(0);
+        yPaces.add(0);
+
+        // Segment 1: Go to detour point
+        List<Integer> dx = generatePaceSequence(detourX);
+        List<Integer> dy = generatePaceSequence(detourY);
+        addSegment(xPaces, yPaces, dx, dy);
+
+        // Segment 2: Go to goal
+        List<Integer> gx = generatePaceSequence(goalX - detourX);
+        List<Integer> gy = generatePaceSequence(goalY - detourY);
+        addSegment(xPaces, yPaces, gx, gy);
+
+        return new String[]{toSeqString(xPaces), toSeqString(yPaces)};
+    }
+
     private static String[] generateOptimalPath(int goalX, int goalY) {
         List<Integer> xPaces = generatePaceSequence(goalX);
         List<Integer> yPaces = generatePaceSequence(goalY);
@@ -123,7 +171,7 @@ public class Level5 {
         if (xFirst) {
             // Pad Y with zeros at the beginning
             List<Integer> paddedY = new ArrayList<>();
-            paddedY.add(0); // Initial zero
+            paddedY.add(0);
             for (int i = 1; i < xPaces.size(); i++) {
                 paddedY.add(0);
             }
@@ -134,7 +182,7 @@ public class Level5 {
         } else {
             // Pad X with zeros at the beginning
             List<Integer> paddedX = new ArrayList<>();
-            paddedX.add(0); // Initial zero
+            paddedX.add(0);
             for (int i = 1; i < yPaces.size(); i++) {
                 paddedX.add(0);
             }
@@ -147,7 +195,7 @@ public class Level5 {
 
     private static List<Integer> generatePaceSequence(int distance) {
         List<Integer> paces = new ArrayList<>();
-        paces.add(0); // Start at rest
+        paces.add(0);
 
         if (distance == 0) {
             paces.add(0);
@@ -157,11 +205,7 @@ public class Level5 {
         int absDistance = Math.abs(distance);
         int direction = distance > 0 ? 1 : -1;
 
-        // Find optimal minimum pace
-        // Total without cruise: 11 - 2*minPace
-        // We need: 11 - 2*minPace <= absDistance
-        // Therefore: minPace >= (11 - absDistance) / 2
-
+        // minPace >= (11 - absDistance) / 2
         int minPace = (int) Math.ceil((11.0 - absDistance) / 2.0);
         if (minPace < 1) minPace = 1;
         if (minPace > 5) minPace = 5;
@@ -185,7 +229,7 @@ public class Level5 {
             paces.add(pace * direction);
         }
 
-        paces.add(0); // End at rest
+        paces.add(0);
         return paces;
     }
 
@@ -237,7 +281,6 @@ public class Level5 {
         int vx = 0, vy = 0;
         int tickX = 0, tickY = 0;
 
-        // Check initial position
         if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
             return false;
         }
@@ -245,20 +288,17 @@ public class Level5 {
         int maxSteps = Math.max(xPaces.size(), yPaces.size());
 
         for (int step = 0; step < maxSteps; step++) {
-            // Update velocities (paces)
             if (step < xPaces.size()) vx = xPaces.get(step);
             else vx = 0;
 
             if (step < yPaces.size()) vy = yPaces.get(step);
             else vy = 0;
 
-            // Simulate this pace step
             int xSteps = Math.abs(vx) > 0 ? Math.abs(vx) : 1;
             int ySteps = Math.abs(vy) > 0 ? Math.abs(vy) : 1;
             int maxTicks = Math.max(xSteps, ySteps);
 
             for (int tick = 0; tick < maxTicks; tick++) {
-                // X movement
                 if (vx != 0) {
                     tickX++;
                     if (tickX >= Math.abs(vx)) {
@@ -269,7 +309,6 @@ public class Level5 {
                     tickX = 0;
                 }
 
-                // Y movement
                 if (vy != 0) {
                     tickY++;
                     if (tickY >= Math.abs(vy)) {
@@ -280,14 +319,12 @@ public class Level5 {
                     tickY = 0;
                 }
 
-                // Check collision after each tick
                 if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
                     return false;
                 }
             }
         }
 
-        // Verify we reached the goal and stopped
         return x == goalX && y == goalY && vx == 0 && vy == 0;
     }
 
