@@ -73,24 +73,29 @@ public class Level5 {
     }
 
     private static String[] findPath(int goalX, int goalY, int asteroidX, int asteroidY) {
-        // Try direct path first
+        // Try direct path first (simultaneous X and Y)
         String[] direct = generateOptimalPath(goalX, goalY);
         if (isSafe(direct[0], direct[1], asteroidX, asteroidY, goalX, goalY)) {
             return direct;
         }
 
-        // Try detours with increasing offsets
+        // Try X first, then Y
+        String[] xFirst = generateSequentialPath(goalX, goalY, true);
+        if (isSafe(xFirst[0], xFirst[1], asteroidX, asteroidY, goalX, goalY)) {
+            return xFirst;
+        }
+
+        // Try Y first, then X
+        String[] yFirst = generateSequentialPath(goalX, goalY, false);
+        if (isSafe(yFirst[0], yFirst[1], asteroidX, asteroidY, goalX, goalY)) {
+            return yFirst;
+        }
+
+        // Try detours with waypoints
         for (int offset = 3; offset <= 100; offset += 2) {
-            // Try all 8 directions
             int[][] detours = {
-                {0, offset},       // Up
-                {0, -offset},      // Down
-                {offset, 0},       // Right
-                {-offset, 0},      // Left
-                {offset, offset},  // Diagonal
-                {-offset, offset},
-                {offset, -offset},
-                {-offset, -offset}
+                {0, offset}, {0, -offset}, {offset, 0}, {-offset, 0},
+                {offset, offset}, {-offset, offset}, {offset, -offset}, {-offset, -offset}
             };
 
             for (int[] detour : detours) {
@@ -111,6 +116,35 @@ public class Level5 {
         return padAndFormat(xPaces, yPaces);
     }
 
+    private static String[] generateSequentialPath(int goalX, int goalY, boolean xFirst) {
+        List<Integer> xPaces = generatePaceSequence(goalX);
+        List<Integer> yPaces = generatePaceSequence(goalY);
+
+        if (xFirst) {
+            // Pad Y with zeros at the beginning
+            List<Integer> paddedY = new ArrayList<>();
+            paddedY.add(0); // Initial zero
+            for (int i = 1; i < xPaces.size(); i++) {
+                paddedY.add(0);
+            }
+            for (int i = 1; i < yPaces.size(); i++) {
+                paddedY.add(yPaces.get(i));
+            }
+            return new String[]{toSeqString(xPaces), toSeqString(paddedY)};
+        } else {
+            // Pad X with zeros at the beginning
+            List<Integer> paddedX = new ArrayList<>();
+            paddedX.add(0); // Initial zero
+            for (int i = 1; i < yPaces.size(); i++) {
+                paddedX.add(0);
+            }
+            for (int i = 1; i < xPaces.size(); i++) {
+                paddedX.add(xPaces.get(i));
+            }
+            return new String[]{toSeqString(paddedX), toSeqString(yPaces)};
+        }
+    }
+
     private static List<Integer> generatePaceSequence(int distance) {
         List<Integer> paces = new ArrayList<>();
         paces.add(0); // Start at rest
@@ -123,44 +157,32 @@ public class Level5 {
         int absDistance = Math.abs(distance);
         int direction = distance > 0 ? 1 : -1;
 
-        // Acceleration sequence: 5,4,3,2,1 (getting faster - covers 1+1+1+1+1 = 5 units)
-        // Deceleration sequence: 1,2,3,4,5 (getting slower - covers 1+1+1+1+1 = 5 units)
-        // Total = 10 units
+        // Find optimal minimum pace
+        // Total without cruise: 11 - 2*minPace
+        // We need: 11 - 2*minPace <= absDistance
+        // Therefore: minPace >= (11 - absDistance) / 2
 
-        if (absDistance <= 10) {
-            // Short distance - partial acceleration/deceleration
-            int accelDist = absDistance / 2;
-            int decelDist = absDistance - accelDist;
+        int minPace = (int) Math.ceil((11.0 - absDistance) / 2.0);
+        if (minPace < 1) minPace = 1;
+        if (minPace > 5) minPace = 5;
 
-            // Accelerate
-            for (int i = 0; i < accelDist; i++) {
-                int pace = Math.max(1, 5 - i);
-                paces.add(pace * direction);
-            }
+        int accelMoves = 5 - minPace + 1;
+        int decelMoves = 5 - minPace;
+        int cruiseMoves = absDistance - accelMoves - decelMoves;
 
-            // Decelerate
-            int startPace = Math.max(1, 6 - accelDist);
-            for (int i = 0; i < decelDist; i++) {
-                int pace = Math.min(5, startPace + i);
-                paces.add(pace * direction);
-            }
-        } else {
-            // Long distance - full accel, cruise, full decel
-            // Accelerate: 5,4,3,2,1
-            for (int pace = 5; pace >= 1; pace--) {
-                paces.add(pace * direction);
-            }
+        // Accelerate: 5, 4, 3, 2, 1, ..., minPace
+        for (int pace = 5; pace >= minPace; pace--) {
+            paces.add(pace * direction);
+        }
 
-            // Cruise at pace 1 (fastest)
-            int cruiseDist = absDistance - 10;
-            for (int i = 0; i < cruiseDist; i++) {
-                paces.add(1 * direction);
-            }
+        // Cruise at minPace
+        for (int i = 0; i < cruiseMoves; i++) {
+            paces.add(minPace * direction);
+        }
 
-            // Decelerate: 1,2,3,4,5
-            for (int pace = 1; pace <= 5; pace++) {
-                paces.add(pace * direction);
-            }
+        // Decelerate: minPace+1, ..., 4, 5
+        for (int pace = minPace + 1; pace <= 5; pace++) {
+            paces.add(pace * direction);
         }
 
         paces.add(0); // End at rest
@@ -231,7 +253,6 @@ public class Level5 {
             else vy = 0;
 
             // Simulate this pace step
-            // Each pace value determines how many ticks before moving 1 unit
             int xSteps = Math.abs(vx) > 0 ? Math.abs(vx) : 1;
             int ySteps = Math.abs(vy) > 0 ? Math.abs(vy) : 1;
             int maxTicks = Math.max(xSteps, ySteps);
