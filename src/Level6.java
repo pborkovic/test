@@ -92,9 +92,8 @@ public class Level6 {
             return yFirst;
         }
 
-        // Strategy 4: Try small U-shaped detours (faster than large ones)
-        for (int offset = 3; offset <= 15; offset++) {
-            // Try all four cardinal directions
+        // Strategy 4: Try small U-shaped detours
+        for (int offset = 3; offset <= 20; offset++) {
             String[] upPath = generateUShapedPath(goalX, goalY, 0, offset);
             if (isSafe(upPath[0], upPath[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
                 return upPath;
@@ -117,7 +116,7 @@ public class Level6 {
         }
 
         // Strategy 5: Try diagonal detours
-        for (int offset = 3; offset <= 12; offset++) {
+        for (int offset = 3; offset <= 15; offset++) {
             int[][] detours = {
                 {offset, offset}, {-offset, offset}, {offset, -offset}, {-offset, -offset}
             };
@@ -131,8 +130,8 @@ public class Level6 {
         }
 
         // Strategy 6: Try more complex mixed detours
-        for (int dx = -10; dx <= 10; dx += 3) {
-            for (int dy = -10; dy <= 10; dy += 3) {
+        for (int dx = -12; dx <= 12; dx += 2) {
+            for (int dy = -12; dy <= 12; dy += 2) {
                 if (dx == 0 && dy == 0) continue;
                 String[] path = generateDetourPath(goalX, goalY, dx, dy);
                 if (isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
@@ -244,27 +243,25 @@ public class Level6 {
         }
 
         // Calculate optimal min pace for this distance
-        // We want: accel_moves + cruise_moves + decel_moves = distance
-        // accel_moves = (5 - minPace + 1), decel_moves = (5 - minPace)
         int minPace = (int) Math.ceil((11.0 - absDistance) / 2.0);
         if (minPace < 1) minPace = 1;
         if (minPace > 5) minPace = 5;
 
-        int accelMoves = 5 - minPace + 1;  // How many moves during acceleration
-        int decelMoves = 5 - minPace;       // How many moves during deceleration
+        int accelMoves = 5 - minPace + 1;
+        int decelMoves = 5 - minPace;
         int cruiseMoves = absDistance - accelMoves - decelMoves;
 
-        // Acceleration phase: 5, 4, 3, ... down to minPace
+        // Acceleration phase
         for (int pace = 5; pace >= minPace; pace--) {
             paces.add(pace * direction);
         }
 
-        // Cruise phase: maintain minPace
+        // Cruise phase
         for (int i = 0; i < cruiseMoves; i++) {
             paces.add(minPace * direction);
         }
 
-        // Deceleration phase: minPace+1, minPace+2, ... up to 5
+        // Deceleration phase
         for (int pace = minPace + 1; pace <= 5; pace++) {
             paces.add(pace * direction);
         }
@@ -275,11 +272,9 @@ public class Level6 {
 
     private static void addSegment(List<Integer> xPaces, List<Integer> yPaces,
                                     List<Integer> xSeg, List<Integer> ySeg) {
-        // Skip the first 0 from segment (already have it)
         for (int i = 1; i < xSeg.size(); i++) xPaces.add(xSeg.get(i));
         for (int i = 1; i < ySeg.size(); i++) yPaces.add(ySeg.get(i));
 
-        // Pad to equal length
         while (xPaces.size() < yPaces.size()) xPaces.add(0);
         while (yPaces.size() < xPaces.size()) yPaces.add(0);
     }
@@ -305,19 +300,19 @@ public class Level6 {
         while (xPaces.size() < yPaces.size()) xPaces.add(0);
         while (yPaces.size() < xPaces.size()) yPaces.add(0);
 
-        // Expand paces - each pace of value V lasts for abs(V) ticks (or 1 tick if V=0)
+        // Expand paces - each pace of value V is repeated abs(V) times (or 1 if V=0)
         List<Integer> expandedX = new ArrayList<>();
         List<Integer> expandedY = new ArrayList<>();
 
         for (int pace : xPaces) {
-            int repeats = (pace == 0) ? 1 : Math.abs(pace);
+            int repeats = Math.max(1, Math.abs(pace));
             for (int i = 0; i < repeats; i++) {
                 expandedX.add(pace);
             }
         }
 
         for (int pace : yPaces) {
-            int repeats = (pace == 0) ? 1 : Math.abs(pace);
+            int repeats = Math.max(1, Math.abs(pace));
             for (int i = 0; i < repeats; i++) {
                 expandedY.add(pace);
             }
@@ -327,47 +322,42 @@ public class Level6 {
         while (expandedX.size() < expandedY.size()) expandedX.add(0);
         while (expandedY.size() < expandedX.size()) expandedY.add(0);
 
-        // Simulate with tick-based movement
+        // Simulate exactly as visualizer does: set velocity, then call move()
         int x = 0, y = 0;
-        int tickX = 0, tickY = 0;
+        int ticksX = 0, ticksY = 0;
 
         // Check initial position
         if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
             return false;
         }
 
+        // For each step in the expanded sequence
         for (int step = 0; step < expandedX.size(); step++) {
             int vx = expandedX.get(step);
             int vy = expandedY.get(step);
 
-            // Process X movement
-            if (vx != 0 && Math.abs(vx) >= 1 && Math.abs(vx) <= 5) {
-                tickX++;
-                if (tickX >= Math.abs(vx)) {
-                    tickX = 0;
+            // Simulate move() function from visualizer
+            // Process X axis
+            if (Math.abs(vx) > 0 && Math.abs(vx) <= 5) {
+                ticksX++;
+                if (ticksX >= Math.abs(vx)) {
+                    ticksX = 0;
                     x += (vx > 0) ? 1 : -1;
-                    // Check collision after movement
-                    if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
-                        return false;
-                    }
                 }
-            } else {
-                tickX = 0;
             }
 
-            // Process Y movement
-            if (vy != 0 && Math.abs(vy) >= 1 && Math.abs(vy) <= 5) {
-                tickY++;
-                if (tickY >= Math.abs(vy)) {
-                    tickY = 0;
+            // Process Y axis
+            if (Math.abs(vy) > 0 && Math.abs(vy) <= 5) {
+                ticksY++;
+                if (ticksY >= Math.abs(vy)) {
+                    ticksY = 0;
                     y += (vy > 0) ? 1 : -1;
-                    // Check collision after movement
-                    if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
-                        return false;
-                    }
                 }
-            } else {
-                tickY = 0;
+            }
+
+            // Check collision after move
+            if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
+                return false;
             }
         }
 
