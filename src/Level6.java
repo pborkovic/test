@@ -86,6 +86,32 @@ public class Level6 {
             return directFast;
         }
 
+        // Strategy 2.1: Try ULTRA-FAST mode (even more aggressive)
+        String[] ultraFast = generateUltraFastPath(goalX, goalY);
+        if (isSafe(ultraFast[0], ultraFast[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
+            return ultraFast;
+        }
+
+        // Strategy 2.5: Try direct paths with strategic pauses (pace 0) to change collision timing
+        for (int pauseSteps = 1; pauseSteps <= 10; pauseSteps++) {
+            // Try inserting pauses at the beginning
+            String[] pathWithPause = generatePathWithInitialPause(goalX, goalY, pauseSteps);
+            if (isSafe(pathWithPause[0], pathWithPause[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
+                return pathWithPause;
+            }
+
+            // Try inserting pauses in X or Y axis at start
+            String[] xPause = generatePathWithAxisPause(goalX, goalY, pauseSteps, true);
+            if (isSafe(xPause[0], xPause[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
+                return xPause;
+            }
+
+            String[] yPause = generatePathWithAxisPause(goalX, goalY, pauseSteps, false);
+            if (isSafe(yPause[0], yPause[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
+                return yPause;
+            }
+        }
+
         // Strategy 3: Try sequential X-first and Y-first paths
         String[] xFirst = generateSequentialPath(goalX, goalY, true, true);
         if (isSafe(xFirst[0], xFirst[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
@@ -552,6 +578,125 @@ public class Level6 {
         List<Integer> xPaces = generatePaceSequence(goalX, fast);
         List<Integer> yPaces = generatePaceSequence(goalY, fast);
         return padAndFormat(xPaces, yPaces);
+    }
+
+    private static String[] generateUltraFastPath(int goalX, int goalY) {
+        List<Integer> xPaces = generateUltraFastSequence(goalX);
+        List<Integer> yPaces = generateUltraFastSequence(goalY);
+        return padAndFormat(xPaces, yPaces);
+    }
+
+    private static List<Integer> generateUltraFastSequence(int distance) {
+        List<Integer> paces = new ArrayList<>();
+        paces.add(0);
+
+        if (distance == 0) {
+            paces.add(0);
+            return paces;
+        }
+
+        int absDistance = Math.abs(distance);
+        int direction = distance > 0 ? 1 : -1;
+
+        // For very short distances, use minimal path
+        if (absDistance == 1) {
+            paces.add(5 * direction);
+            paces.add(0);
+            return paces;
+        } else if (absDistance == 2) {
+            paces.add(5 * direction);
+            paces.add(5 * direction);
+            paces.add(0);
+            return paces;
+        } else if (absDistance == 3) {
+            paces.add(4 * direction);
+            paces.add(3 * direction);
+            paces.add(4 * direction);
+            paces.add(0);
+            return paces;
+        } else if (absDistance == 4) {
+            paces.add(3 * direction);
+            paces.add(2 * direction);
+            paces.add(2 * direction);
+            paces.add(3 * direction);
+            paces.add(0);
+            return paces;
+        }
+
+        // For longer distances: ultra-minimal accel/decel, maximize pace 1
+        // Use 4-3-2-1...1-2-3-4 pattern (skip pace 5 entirely for speed)
+        paces.add(4 * direction);
+        paces.add(3 * direction);
+        paces.add(2 * direction);
+
+        // Use pace 1 for remaining distance
+        for (int i = 0; i < absDistance - 6; i++) {
+            paces.add(1 * direction);
+        }
+
+        paces.add(2 * direction);
+        paces.add(3 * direction);
+        paces.add(4 * direction);
+        paces.add(0);
+
+        return paces;
+    }
+
+    private static String[] generatePathWithInitialPause(int goalX, int goalY, int pauseSteps) {
+        List<Integer> xPaces = generatePaceSequence(goalX, true);
+        List<Integer> yPaces = generatePaceSequence(goalY, true);
+
+        // Insert pause steps at the beginning (after initial 0)
+        List<Integer> xWithPause = new ArrayList<>();
+        List<Integer> yWithPause = new ArrayList<>();
+
+        xWithPause.add(0);
+        yWithPause.add(0);
+
+        // Add pause steps
+        for (int i = 0; i < pauseSteps; i++) {
+            xWithPause.add(0);
+            yWithPause.add(0);
+        }
+
+        // Add the rest of the path (skip the initial 0)
+        for (int i = 1; i < xPaces.size(); i++) {
+            xWithPause.add(xPaces.get(i));
+        }
+        for (int i = 1; i < yPaces.size(); i++) {
+            yWithPause.add(yPaces.get(i));
+        }
+
+        return padAndFormat(xWithPause, yWithPause);
+    }
+
+    private static String[] generatePathWithAxisPause(int goalX, int goalY, int pauseSteps, boolean pauseX) {
+        List<Integer> xPaces = generatePaceSequence(goalX, true);
+        List<Integer> yPaces = generatePaceSequence(goalY, true);
+
+        if (pauseX) {
+            // Pause X axis, let Y move
+            List<Integer> xWithPause = new ArrayList<>();
+            xWithPause.add(0);
+            for (int i = 0; i < pauseSteps; i++) {
+                xWithPause.add(0);
+            }
+            for (int i = 1; i < xPaces.size(); i++) {
+                xWithPause.add(xPaces.get(i));
+            }
+            return padAndFormat(xWithPause, yPaces);
+        } else {
+            // Pause Y axis, let X move
+            List<Integer> yWithPause = new ArrayList<>();
+            yWithPause.add(0);
+            for (int i = 0; i < pauseSteps; i++) {
+                yWithPause.add(0);
+            }
+            for (int i = 1; i < yPaces.size(); i++) {
+                yWithPause.add(yPaces.get(i));
+            }
+            return padAndFormat(xPaces, yWithPause);
+        }
     }
 
     private static String[] generateSequentialPath(int goalX, int goalY, boolean xFirst, boolean fast) {
