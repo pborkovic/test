@@ -92,36 +92,15 @@ public class Level6 {
             return yFirst;
         }
 
-        // Strategy 4: Try small U-shaped detours
-        for (int offset = 3; offset <= 20; offset++) {
-            String[] upPath = generateUShapedPath(goalX, goalY, 0, offset);
-            if (isSafe(upPath[0], upPath[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
-                return upPath;
-            }
-
-            String[] downPath = generateUShapedPath(goalX, goalY, 0, -offset);
-            if (isSafe(downPath[0], downPath[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
-                return downPath;
-            }
-
-            String[] rightPath = generateUShapedPath(goalX, goalY, offset, 0);
-            if (isSafe(rightPath[0], rightPath[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
-                return rightPath;
-            }
-
-            String[] leftPath = generateUShapedPath(goalX, goalY, -offset, 0);
-            if (isSafe(leftPath[0], leftPath[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
-                return leftPath;
-            }
-        }
-
-        // Strategy 5: Try diagonal detours
-        for (int offset = 3; offset <= 15; offset++) {
-            int[][] detours = {
+        // Strategy 4: Try VERY small detours first (minimal offsets for tight time limits)
+        for (int offset = 3; offset <= 10; offset += 1) {
+            // Try tiny offsets in all directions
+            int[][] micro = {
+                {0, offset}, {0, -offset}, {offset, 0}, {-offset, 0},
+                {offset, 0}, {-offset, 0}, {0, offset}, {0, -offset},
                 {offset, offset}, {-offset, offset}, {offset, -offset}, {-offset, -offset}
             };
-
-            for (int[] detour : detours) {
+            for (int[] detour : micro) {
                 String[] path = generateDetourPath(goalX, goalY, detour[0], detour[1]);
                 if (isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
                     return path;
@@ -129,10 +108,63 @@ public class Level6 {
             }
         }
 
-        // Strategy 6: Try more complex mixed detours
-        for (int dx = -12; dx <= 12; dx += 2) {
-            for (int dy = -12; dy <= 12; dy += 2) {
+        // Strategy 5: Try U-shaped detours with increasing offsets
+        for (int offset = 3; offset <= 50; offset += 1) {
+            // Try all four cardinal directions
+            int[][] cardinals = {{0, offset}, {0, -offset}, {offset, 0}, {-offset, 0}};
+            for (int[] detour : cardinals) {
+                String[] path = generateUShapedPath(goalX, goalY, detour[0], detour[1]);
+                if (isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
+                    return path;
+                }
+            }
+        }
+
+        // Strategy 6: Try diagonal detours
+        for (int offset = 3; offset <= 30; offset += 1) {
+            int[][] diagonals = {
+                {offset, offset}, {-offset, offset}, {offset, -offset}, {-offset, -offset}
+            };
+            for (int[] detour : diagonals) {
+                String[] path = generateDetourPath(goalX, goalY, detour[0], detour[1]);
+                if (isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
+                    return path;
+                }
+            }
+        }
+
+        // Strategy 7: Try waypoints in a grid pattern around the asteroid
+        int astToGoalDX = goalX - asteroidX;
+        int astToGoalDY = goalY - asteroidY;
+
+        // Try waypoints perpendicular to the asteroid-goal line
+        for (int perp = 5; perp <= 25; perp += 2) {
+            // Perpendicular offsets
+            int[][] perps = {
+                {asteroidX + perp, asteroidY},
+                {asteroidX - perp, asteroidY},
+                {asteroidX, asteroidY + perp},
+                {asteroidX, asteroidY - perp},
+                {asteroidX + perp, asteroidY + perp},
+                {asteroidX - perp, asteroidY + perp},
+                {asteroidX + perp, asteroidY - perp},
+                {asteroidX - perp, asteroidY - perp}
+            };
+            for (int[] waypoint : perps) {
+                String[] path = generateDetourPath(goalX, goalY, waypoint[0], waypoint[1]);
+                if (isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
+                    return path;
+                }
+            }
+        }
+
+        // Strategy 8: Try wide range of mixed detours
+        for (int dx = -40; dx <= 40; dx += 4) {
+            for (int dy = -40; dy <= 40; dy += 4) {
                 if (dx == 0 && dy == 0) continue;
+                // Skip if waypoint is too close to asteroid
+                if (Math.abs(dx - asteroidX) <= 3 && Math.abs(dy - asteroidY) <= 3) continue;
+
                 String[] path = generateDetourPath(goalX, goalY, dx, dy);
                 if (isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY, timeLimit)) {
                     return path;
@@ -140,8 +172,96 @@ public class Level6 {
             }
         }
 
-        // Fallback: return direct path even if not ideal
+        // Fallback: Try emergency detours ignoring time limit
+        // This is better than returning a colliding path
+        for (int offset = 3; offset <= 80; offset += 2) {
+            int[][] emergency = {
+                {0, offset}, {0, -offset}, {offset, 0}, {-offset, 0},
+                {offset, offset}, {-offset, offset}, {offset, -offset}, {-offset, -offset}
+            };
+            for (int[] detour : emergency) {
+                String[] path = generateDetourPath(goalX, goalY, detour[0], detour[1]);
+                // Check without time limit constraint
+                if (isSafeWithoutTimeLimit(path[0], path[1], asteroidX, asteroidY, goalX, goalY)) {
+                    return path;
+                }
+            }
+        }
+
+        // Last resort: return direct path
         return direct;
+    }
+
+    private static boolean isSafeWithoutTimeLimit(String xSeq, String ySeq, int asteroidX, int asteroidY,
+                                                    int goalX, int goalY) {
+        List<Integer> xPaces = parseSeq(xSeq);
+        List<Integer> yPaces = parseSeq(ySeq);
+
+        // Pad sequences to same length
+        while (xPaces.size() < yPaces.size()) xPaces.add(0);
+        while (yPaces.size() < xPaces.size()) yPaces.add(0);
+
+        // Expand paces
+        List<Integer> expandedX = new ArrayList<>();
+        List<Integer> expandedY = new ArrayList<>();
+
+        for (int pace : xPaces) {
+            int repeats = Math.max(1, Math.abs(pace));
+            for (int i = 0; i < repeats; i++) {
+                expandedX.add(pace);
+            }
+        }
+
+        for (int pace : yPaces) {
+            int repeats = Math.max(1, Math.abs(pace));
+            for (int i = 0; i < repeats; i++) {
+                expandedY.add(pace);
+            }
+        }
+
+        // Pad expanded sequences
+        while (expandedX.size() < expandedY.size()) expandedX.add(0);
+        while (expandedY.size() < expandedX.size()) expandedY.add(0);
+
+        // Simulate
+        int x = 0, y = 0;
+        int ticksX = 0, ticksY = 0;
+
+        // Check initial position
+        if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
+            return false;
+        }
+
+        for (int step = 0; step < expandedX.size(); step++) {
+            int vx = expandedX.get(step);
+            int vy = expandedY.get(step);
+
+            // Process X axis
+            if (Math.abs(vx) > 0 && Math.abs(vx) <= 5) {
+                ticksX++;
+                if (ticksX >= Math.abs(vx)) {
+                    ticksX = 0;
+                    x += (vx > 0) ? 1 : -1;
+                }
+            }
+
+            // Process Y axis
+            if (Math.abs(vy) > 0 && Math.abs(vy) <= 5) {
+                ticksY++;
+                if (ticksY >= Math.abs(vy)) {
+                    ticksY = 0;
+                    y += (vy > 0) ? 1 : -1;
+                }
+            }
+
+            // Check collision
+            if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
+                return false;
+            }
+        }
+
+        // Check if we reached the goal
+        return x == goalX && y == goalY;
     }
 
     private static String[] generateOptimalPath(int goalX, int goalY) {
@@ -222,6 +342,10 @@ public class Level6 {
     }
 
     private static List<Integer> generatePaceSequence(int distance) {
+        return generatePaceSequence(distance, false);
+    }
+
+    private static List<Integer> generatePaceSequence(int distance, boolean fast) {
         List<Integer> paces = new ArrayList<>();
         paces.add(0);
 
@@ -238,6 +362,27 @@ public class Level6 {
             for (int i = 0; i < absDistance; i++) {
                 paces.add(5 * direction);
             }
+            paces.add(0);
+            return paces;
+        }
+
+        if (fast) {
+            // Fast mode: minimize time by using pace 1 (fastest) as much as possible
+            // Only use minimal acceleration/deceleration
+            paces.add(5 * direction);
+            paces.add(4 * direction);
+            paces.add(3 * direction);
+            paces.add(2 * direction);
+
+            // Use pace 1 for remaining distance
+            for (int i = 0; i < absDistance - 8; i++) {
+                paces.add(1 * direction);
+            }
+
+            paces.add(2 * direction);
+            paces.add(3 * direction);
+            paces.add(4 * direction);
+            paces.add(5 * direction);
             paces.add(0);
             return paces;
         }
