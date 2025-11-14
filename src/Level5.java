@@ -103,40 +103,125 @@ public class Level5 {
             return direct;
         }
 
-        // Try various detour strategies with wider range
-        // Strategy 1: Vertical detours (go up/down first, then horizontal)
-        for (int detour = -20; detour <= 20; detour++) {
-            if (detour == 0) continue;
-            String[] path = generateVerticalDetour(goal, asteroid, timeLimit, detour);
+        // Calculate optimal waypoints to avoid the danger zone (radius 2 around asteroid)
+        // Safe distance is 3 or more from asteroid
+        List<Point> waypoints = new ArrayList<>();
+
+        // Try going around each side of the asteroid
+        for (int offset = 3; offset <= 30; offset++) {
+            // Above: asteroid.y + offset
+            waypoints.add(new Point(goal.x, asteroid.y + offset));
+            waypoints.add(new Point(0, asteroid.y + offset));
+            waypoints.add(new Point(asteroid.x, asteroid.y + offset));
+
+            // Below: asteroid.y - offset
+            waypoints.add(new Point(goal.x, asteroid.y - offset));
+            waypoints.add(new Point(0, asteroid.y - offset));
+            waypoints.add(new Point(asteroid.x, asteroid.y - offset));
+
+            // Right: asteroid.x + offset
+            waypoints.add(new Point(asteroid.x + offset, goal.y));
+            waypoints.add(new Point(asteroid.x + offset, 0));
+            waypoints.add(new Point(asteroid.x + offset, asteroid.y));
+
+            // Left: asteroid.x - offset
+            waypoints.add(new Point(asteroid.x - offset, goal.y));
+            waypoints.add(new Point(asteroid.x - offset, 0));
+            waypoints.add(new Point(asteroid.x - offset, asteroid.y));
+        }
+
+        // Try each waypoint
+        for (Point waypoint : waypoints) {
+            String[] path = generateWaypointPath(waypoint, goal, timeLimit);
             if (path != null && isPathSafe(path, asteroid, goal)) {
                 return path;
             }
         }
 
-        // Strategy 2: Horizontal detours (go left/right first, then vertical)
-        for (int detour = -20; detour <= 20; detour++) {
-            if (detour == 0) continue;
-            String[] path = generateHorizontalDetour(goal, asteroid, timeLimit, detour);
+        // Try simple 3-segment paths: (0,0) -> (0,safeY) -> (goalX,safeY) -> (goalX,goalY)
+        for (int yOffset = 3; yOffset <= 50; yOffset++) {
+            int safeY = asteroid.y + yOffset;
+            String[] path = generate3SegmentYFirst(goal.x, goal.y, safeY, timeLimit);
+            if (path != null && isPathSafe(path, asteroid, goal)) {
+                return path;
+            }
+
+            safeY = asteroid.y - yOffset;
+            path = generate3SegmentYFirst(goal.x, goal.y, safeY, timeLimit);
             if (path != null && isPathSafe(path, asteroid, goal)) {
                 return path;
             }
         }
 
-        // Strategy 3: Try waypoint routing around asteroid
-        // Calculate safe waypoints based on asteroid position
-        int[] waypointOffsets = {-4, -5, -6, -7, 4, 5, 6, 7, -8, 8, -10, 10, -15, 15};
-        for (int xOffset : waypointOffsets) {
-            for (int yOffset : waypointOffsets) {
-                Point waypoint = new Point(asteroid.x + xOffset, asteroid.y + yOffset);
-                String[] path = generateWaypointPath(waypoint, goal, timeLimit);
-                if (path != null && isPathSafe(path, asteroid, goal)) {
-                    return path;
-                }
+        // Try X-first: (0,0) -> (safeX,0) -> (safeX,goalY) -> (goalX,goalY)
+        for (int xOffset = 3; xOffset <= 50; xOffset++) {
+            int safeX = asteroid.x + xOffset;
+            String[] path = generate3SegmentXFirst(goal.x, goal.y, safeX, timeLimit);
+            if (path != null && isPathSafe(path, asteroid, goal)) {
+                return path;
+            }
+
+            safeX = asteroid.x - xOffset;
+            path = generate3SegmentXFirst(goal.x, goal.y, safeX, timeLimit);
+            if (path != null && isPathSafe(path, asteroid, goal)) {
+                return path;
             }
         }
 
-        // Fallback: return direct path (even if unsafe)
+        // Fallback: return direct path
         return direct;
+    }
+
+    private static String[] generate3SegmentYFirst(int goalX, int goalY, int intermediateY, int timeLimit) {
+        List<Integer> xSeq = new ArrayList<>();
+        List<Integer> ySeq = new ArrayList<>();
+
+        xSeq.add(0);
+        ySeq.add(0);
+
+        // Segment 1: Move Y from 0 to intermediateY
+        List<Integer> seg1Y = parseSequence(generateSequence1D(intermediateY, timeLimit));
+        addSequencePart(ySeq, seg1Y);
+        padSequence(xSeq, seg1Y.size() - 1);
+
+        // Segment 2: Move X from 0 to goalX
+        List<Integer> seg2X = parseSequence(generateSequence1D(goalX, timeLimit));
+        addSequencePart(xSeq, seg2X);
+        padSequence(ySeq, seg2X.size() - 1);
+
+        // Segment 3: Move Y from intermediateY to goalY
+        int remainingY = goalY - intermediateY;
+        List<Integer> seg3Y = parseSequence(generateSequence1D(remainingY, timeLimit));
+        addSequencePart(ySeq, seg3Y);
+        padSequence(xSeq, seg3Y.size() - 1);
+
+        return new String[]{sequenceToString(xSeq), sequenceToString(ySeq)};
+    }
+
+    private static String[] generate3SegmentXFirst(int goalX, int goalY, int intermediateX, int timeLimit) {
+        List<Integer> xSeq = new ArrayList<>();
+        List<Integer> ySeq = new ArrayList<>();
+
+        xSeq.add(0);
+        ySeq.add(0);
+
+        // Segment 1: Move X from 0 to intermediateX
+        List<Integer> seg1X = parseSequence(generateSequence1D(intermediateX, timeLimit));
+        addSequencePart(xSeq, seg1X);
+        padSequence(ySeq, seg1X.size() - 1);
+
+        // Segment 2: Move Y from 0 to goalY
+        List<Integer> seg2Y = parseSequence(generateSequence1D(goalY, timeLimit));
+        addSequencePart(ySeq, seg2Y);
+        padSequence(xSeq, seg2Y.size() - 1);
+
+        // Segment 3: Move X from intermediateX to goalX
+        int remainingX = goalX - intermediateX;
+        List<Integer> seg3X = parseSequence(generateSequence1D(remainingX, timeLimit));
+        addSequencePart(xSeq, seg3X);
+        padSequence(ySeq, seg3X.size() - 1);
+
+        return new String[]{sequenceToString(xSeq), sequenceToString(ySeq)};
     }
 
     private static String[] generateDirectPath(Point goal, int timeLimit) {
