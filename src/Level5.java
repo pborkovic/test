@@ -74,53 +74,100 @@ public class Level5 {
 
     private static String[] findPath(int goalX, int goalY, int asteroidX, int asteroidY) {
         // Try direct path first
-        String[] direct = generateDirectPath(goalX, goalY);
+        String[] direct = generateOptimalPath(goalX, goalY);
         if (isSafe(direct[0], direct[1], asteroidX, asteroidY, goalX, goalY)) {
             return direct;
         }
 
-        // Need to detour around asteroid
-        // Try going around in different directions
-        int[] detourOffsets = {3, 4, 5, 6, 7, 8, 10, 15, 20, 30, 50, 100};
+        // Try detours with increasing offsets
+        for (int offset = 3; offset <= 100; offset += 2) {
+            // Try all 8 directions
+            int[][] detours = {
+                {0, offset},       // Up
+                {0, -offset},      // Down
+                {offset, 0},       // Right
+                {-offset, 0},      // Left
+                {offset, offset},  // Diagonal
+                {-offset, offset},
+                {offset, -offset},
+                {-offset, -offset}
+            };
 
-        for (int offset : detourOffsets) {
-            // Try going UP first
-            String[] path = generateDetourPath(goalX, goalY, 0, offset, asteroidX, asteroidY);
-            if (path != null && isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY)) {
-                return path;
-            }
-
-            // Try going DOWN first
-            path = generateDetourPath(goalX, goalY, 0, -offset, asteroidX, asteroidY);
-            if (path != null && isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY)) {
-                return path;
-            }
-
-            // Try going RIGHT first
-            path = generateDetourPath(goalX, goalY, offset, 0, asteroidX, asteroidY);
-            if (path != null && isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY)) {
-                return path;
-            }
-
-            // Try going LEFT first
-            path = generateDetourPath(goalX, goalY, -offset, 0, asteroidX, asteroidY);
-            if (path != null && isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY)) {
-                return path;
+            for (int[] detour : detours) {
+                String[] path = generateDetourPath(goalX, goalY, detour[0], detour[1]);
+                if (isSafe(path[0], path[1], asteroidX, asteroidY, goalX, goalY)) {
+                    return path;
+                }
             }
         }
 
-        // Fallback - return direct path (shouldn't happen with generous time)
+        // Fallback
         return direct;
     }
 
-    private static String[] generateDirectPath(int goalX, int goalY) {
-        String xSeq = generateSequence(goalX);
-        String ySeq = generateSequence(goalY);
-        return padSequences(xSeq, ySeq);
+    private static String[] generateOptimalPath(int goalX, int goalY) {
+        List<Integer> xPaces = generatePaceSequence(goalX);
+        List<Integer> yPaces = generatePaceSequence(goalY);
+        return padAndFormat(xPaces, yPaces);
     }
 
-    private static String[] generateDetourPath(int goalX, int goalY, int waypointX, int waypointY,
-                                              int asteroidX, int asteroidY) {
+    private static List<Integer> generatePaceSequence(int distance) {
+        List<Integer> paces = new ArrayList<>();
+        paces.add(0); // Start at rest
+
+        if (distance == 0) {
+            paces.add(0);
+            return paces;
+        }
+
+        int absDistance = Math.abs(distance);
+        int direction = distance > 0 ? 1 : -1;
+
+        // Acceleration sequence: 5,4,3,2,1 (getting faster - covers 1+1+1+1+1 = 5 units)
+        // Deceleration sequence: 1,2,3,4,5 (getting slower - covers 1+1+1+1+1 = 5 units)
+        // Total = 10 units
+
+        if (absDistance <= 10) {
+            // Short distance - partial acceleration/deceleration
+            int accelDist = absDistance / 2;
+            int decelDist = absDistance - accelDist;
+
+            // Accelerate
+            for (int i = 0; i < accelDist; i++) {
+                int pace = Math.max(1, 5 - i);
+                paces.add(pace * direction);
+            }
+
+            // Decelerate
+            int startPace = Math.max(1, 6 - accelDist);
+            for (int i = 0; i < decelDist; i++) {
+                int pace = Math.min(5, startPace + i);
+                paces.add(pace * direction);
+            }
+        } else {
+            // Long distance - full accel, cruise, full decel
+            // Accelerate: 5,4,3,2,1
+            for (int pace = 5; pace >= 1; pace--) {
+                paces.add(pace * direction);
+            }
+
+            // Cruise at pace 1 (fastest)
+            int cruiseDist = absDistance - 10;
+            for (int i = 0; i < cruiseDist; i++) {
+                paces.add(1 * direction);
+            }
+
+            // Decelerate: 1,2,3,4,5
+            for (int pace = 1; pace <= 5; pace++) {
+                paces.add(pace * direction);
+            }
+        }
+
+        paces.add(0); // End at rest
+        return paces;
+    }
+
+    private static String[] generateDetourPath(int goalX, int goalY, int waypointX, int waypointY) {
         List<Integer> xPaces = new ArrayList<>();
         List<Integer> yPaces = new ArrayList<>();
 
@@ -128,15 +175,15 @@ public class Level5 {
         yPaces.add(0);
 
         // Segment 1: Go to waypoint
-        List<Integer> wx = parseSeq(generateSequence(waypointX));
-        List<Integer> wy = parseSeq(generateSequence(waypointY));
+        List<Integer> wx = generatePaceSequence(waypointX);
+        List<Integer> wy = generatePaceSequence(waypointY);
         addSegment(xPaces, yPaces, wx, wy);
 
         // Segment 2: From waypoint to goal
         int remainingX = goalX - waypointX;
         int remainingY = goalY - waypointY;
-        List<Integer> rx = parseSeq(generateSequence(remainingX));
-        List<Integer> ry = parseSeq(generateSequence(remainingY));
+        List<Integer> rx = generatePaceSequence(remainingX);
+        List<Integer> ry = generatePaceSequence(remainingY);
         addSegment(xPaces, yPaces, rx, ry);
 
         return new String[]{toSeqString(xPaces), toSeqString(yPaces)};
@@ -153,30 +200,9 @@ public class Level5 {
         while (yPaces.size() < xPaces.size()) yPaces.add(0);
     }
 
-    private static String generateSequence(int distance) {
-        if (distance == 0) {
-            return "0 0";
-        }
-
-        StringBuilder sb = new StringBuilder("0");
-        int absDistance = Math.abs(distance);
-        int pace = distance > 0 ? 5 : -5;
-
-        for (int i = 0; i < absDistance; i++) {
-            sb.append(" ").append(pace);
-        }
-        sb.append(" 0");
-
-        return sb.toString();
-    }
-
-    private static String[] padSequences(String xSeq, String ySeq) {
-        List<Integer> xPaces = parseSeq(xSeq);
-        List<Integer> yPaces = parseSeq(ySeq);
-
+    private static String[] padAndFormat(List<Integer> xPaces, List<Integer> yPaces) {
         while (xPaces.size() < yPaces.size()) xPaces.add(0);
         while (yPaces.size() < xPaces.size()) yPaces.add(0);
-
         return new String[]{toSeqString(xPaces), toSeqString(yPaces)};
     }
 
@@ -197,19 +223,20 @@ public class Level5 {
         int maxSteps = Math.max(xPaces.size(), yPaces.size());
 
         for (int step = 0; step < maxSteps; step++) {
-            // Update velocities
+            // Update velocities (paces)
             if (step < xPaces.size()) vx = xPaces.get(step);
             else vx = 0;
 
             if (step < yPaces.size()) vy = yPaces.get(step);
             else vy = 0;
 
-            // Simulate movement for each pace occurrence
-            int xRepeat = Math.max(1, Math.abs(vx));
-            int yRepeat = Math.max(1, Math.abs(vy));
-            int maxRepeat = Math.max(xRepeat, yRepeat);
+            // Simulate this pace step
+            // Each pace value determines how many ticks before moving 1 unit
+            int xSteps = Math.abs(vx) > 0 ? Math.abs(vx) : 1;
+            int ySteps = Math.abs(vy) > 0 ? Math.abs(vy) : 1;
+            int maxTicks = Math.max(xSteps, ySteps);
 
-            for (int tick = 0; tick < maxRepeat; tick++) {
+            for (int tick = 0; tick < maxTicks; tick++) {
                 // X movement
                 if (vx != 0) {
                     tickX++;
@@ -232,7 +259,7 @@ public class Level5 {
                     tickY = 0;
                 }
 
-                // Check collision
+                // Check collision after each tick
                 if (Math.abs(x - asteroidX) <= 2 && Math.abs(y - asteroidY) <= 2) {
                     return false;
                 }
