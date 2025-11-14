@@ -73,52 +73,43 @@ public class Level5 {
     }
 
     private static String[] findPath(int goalX, int goalY, int asteroidX, int asteroidY) {
-        // Try direct path first
         String[] direct = generateOptimalPath(goalX, goalY);
         if (isSafe(direct[0], direct[1], asteroidX, asteroidY, goalX, goalY)) {
             return direct;
         }
 
-        // Try X first, then Y
         String[] xFirst = generateSequentialPath(goalX, goalY, true);
         if (isSafe(xFirst[0], xFirst[1], asteroidX, asteroidY, goalX, goalY)) {
             return xFirst;
         }
 
-        // Try Y first, then X
         String[] yFirst = generateSequentialPath(goalX, goalY, false);
         if (isSafe(yFirst[0], yFirst[1], asteroidX, asteroidY, goalX, goalY)) {
             return yFirst;
         }
 
-        // Try U-shaped paths: perpendicular detour, then parallel, then back
         for (int offset = 3; offset <= 20; offset++) {
-            // Try going UP, then X, then back to Y
             String[] upPath = generateUShapedPath(goalX, goalY, 0, offset);
             if (isSafe(upPath[0], upPath[1], asteroidX, asteroidY, goalX, goalY)) {
                 return upPath;
             }
 
-            // Try going DOWN, then X, then back to Y
             String[] downPath = generateUShapedPath(goalX, goalY, 0, -offset);
             if (isSafe(downPath[0], downPath[1], asteroidX, asteroidY, goalX, goalY)) {
                 return downPath;
             }
 
-            // Try going RIGHT, then Y, then back to X
             String[] rightPath = generateUShapedPath(goalX, goalY, offset, 0);
             if (isSafe(rightPath[0], rightPath[1], asteroidX, asteroidY, goalX, goalY)) {
                 return rightPath;
             }
 
-            // Try going LEFT, then Y, then back to X
             String[] leftPath = generateUShapedPath(goalX, goalY, -offset, 0);
             if (isSafe(leftPath[0], leftPath[1], asteroidX, asteroidY, goalX, goalY)) {
                 return leftPath;
             }
         }
 
-        // Try general waypoint detours
         for (int offset = 3; offset <= 100; offset += 5) {
             int[][] detours = {
                 {0, offset}, {0, -offset}, {offset, 0}, {-offset, 0},
@@ -133,24 +124,20 @@ public class Level5 {
             }
         }
 
-        // Fallback
         return direct;
     }
 
     private static String[] generateUShapedPath(int goalX, int goalY, int detourX, int detourY) {
-        // Generate U-shaped path: (0,0) -> (detourX, detourY) -> (goalX, goalY)
         List<Integer> xPaces = new ArrayList<>();
         List<Integer> yPaces = new ArrayList<>();
 
         xPaces.add(0);
         yPaces.add(0);
 
-        // Segment 1: Go to detour point
         List<Integer> dx = generatePaceSequence(detourX);
         List<Integer> dy = generatePaceSequence(detourY);
         addSegment(xPaces, yPaces, dx, dy);
 
-        // Segment 2: Go to goal
         List<Integer> gx = generatePaceSequence(goalX - detourX);
         List<Integer> gy = generatePaceSequence(goalY - detourY);
         addSegment(xPaces, yPaces, gx, gy);
@@ -161,6 +148,7 @@ public class Level5 {
     private static String[] generateOptimalPath(int goalX, int goalY) {
         List<Integer> xPaces = generatePaceSequence(goalX);
         List<Integer> yPaces = generatePaceSequence(goalY);
+
         return padAndFormat(xPaces, yPaces);
     }
 
@@ -169,7 +157,6 @@ public class Level5 {
         List<Integer> yPaces = generatePaceSequence(goalY);
 
         if (xFirst) {
-            // Pad Y with zeros at the beginning
             List<Integer> paddedY = new ArrayList<>();
             paddedY.add(0);
             for (int i = 1; i < xPaces.size(); i++) {
@@ -180,7 +167,6 @@ public class Level5 {
             }
             return new String[]{toSeqString(xPaces), toSeqString(paddedY)};
         } else {
-            // Pad X with zeros at the beginning
             List<Integer> paddedX = new ArrayList<>();
             paddedX.add(0);
             for (int i = 1; i < yPaces.size(); i++) {
@@ -205,7 +191,6 @@ public class Level5 {
         int absDistance = Math.abs(distance);
         int direction = distance > 0 ? 1 : -1;
 
-        // minPace >= (11 - absDistance) / 2
         int minPace = (int) Math.ceil((11.0 - absDistance) / 2.0);
         if (minPace < 1) minPace = 1;
         if (minPace > 5) minPace = 5;
@@ -214,17 +199,14 @@ public class Level5 {
         int decelMoves = 5 - minPace;
         int cruiseMoves = absDistance - accelMoves - decelMoves;
 
-        // Accelerate: 5, 4, 3, 2, 1, ..., minPace
         for (int pace = 5; pace >= minPace; pace--) {
             paces.add(pace * direction);
         }
 
-        // Cruise at minPace
         for (int i = 0; i < cruiseMoves; i++) {
             paces.add(minPace * direction);
         }
 
-        // Decelerate: minPace+1, ..., 4, 5
         for (int pace = minPace + 1; pace <= 5; pace++) {
             paces.add(pace * direction);
         }
@@ -240,12 +222,10 @@ public class Level5 {
         xPaces.add(0);
         yPaces.add(0);
 
-        // Segment 1: Go to waypoint
         List<Integer> wx = generatePaceSequence(waypointX);
         List<Integer> wy = generatePaceSequence(waypointY);
         addSegment(xPaces, yPaces, wx, wy);
 
-        // Segment 2: From waypoint to goal
         int remainingX = goalX - waypointX;
         int remainingY = goalY - waypointY;
         List<Integer> rx = generatePaceSequence(remainingX);
@@ -257,11 +237,9 @@ public class Level5 {
 
     private static void addSegment(List<Integer> xPaces, List<Integer> yPaces,
                                     List<Integer> xSeg, List<Integer> ySeg) {
-        // Skip initial 0 from segments
         for (int i = 1; i < xSeg.size(); i++) xPaces.add(xSeg.get(i));
         for (int i = 1; i < ySeg.size(); i++) yPaces.add(ySeg.get(i));
 
-        // Pad to same length
         while (xPaces.size() < yPaces.size()) xPaces.add(0);
         while (yPaces.size() < xPaces.size()) yPaces.add(0);
     }

@@ -334,7 +334,7 @@
 
   /** @type {GlobalState} */
   const state = {};
-  state.level = 5;
+  state.level = 6;
 
   const SIMULATION_TIME_PER_FRAME = 5 * 1000.0 / 60.0;
 
@@ -490,8 +490,8 @@
       asteroids: [],
       drawAsteroidArea: false,
     };
-    levelInput.value = '6,0 118\n3,0';
-    levelSolution.value = '0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5 4 3 3 4 5 0\n0 5 4 5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -5 -4 -5 0';
+    levelInput.value = '6,0 58\n3,0';
+    levelSolution.value = '0 0 0 0 0 0 0 0 0 0 5 4 3 3 4 5 0\n0 -5 -4 -5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5 4 5 0';
     recalculate();
   }
 
@@ -1719,8 +1719,8 @@
   }
 
   function secret() {
-    /* SECRET */ levelInput.value = '-1,0 200\n0,10';
-    /* SECRET */ levelSolution.value = '0 5 4 3 2 1 1 1 1 2 3 4 5 0 -5 -4 -3 -2 -1 -1 -1 -1 -2 -3 -4 -5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -5 -4 -3 -2 -1 -1 -1 -1 -1 -2 -3 -4 -5 0 0 0 0 0 0 0 0 0 0 0 0 0 5 4 3 2 1 1 1 1 2 3 4 5 0\n0 5 4 3 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 3 4 5 0 -5 -4 -3 -2 -2 -3 -4 -5 0 5 4 3 2 2 3 4 5 0 -5 -4 -3 -2 -2 -3 -4 -5 0 -5 -4 -3 -2 -1 -1 -1 -1 -1 -1 -1 -1 -2 -3 -4 -5 0';
+    /* SECRET */ levelInput.value = '6,0 42\n3,0';
+    /* SECRET */ levelSolution.value = '0 -5 0 5 4 3 2 2 3 4 5 0 -5 0\n0 5 4 5 0 0 0 0 0 0 0 0 0 0 -5 -4 -5 0';
     recalculate();
     setTimeout(() => {
         if (!state.game.simPlaying) {
